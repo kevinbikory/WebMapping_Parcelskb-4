@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>busanza_parcels - Cadastral Parcels</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        #map { height: 100vh; width: 100%; }
+        .legend {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // Initialize Map
+        const map = L.map('map').setView([-1.96, 30.04], 16);
+
+        // Basemap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Color by LandUse
+        function getColor(landuse) {
+            switch(landuse) {
+                case "Residential": return "#8B4513";   // Brown
+                case "Agricultural": return "#228B22";  // Green
+                case "Commercial": return "#FF0000";    // Red
+                default: return "#708090";              // Grey
+            }
+        }
+
+        // Load GeoJSON
+        fetch('busanza_parcels.geojson')   // ←←← Change this to your exact filename if different
+            .then(response => {
+                if (!response.ok) throw new Error("File not found");
+                return response.json();
+            })
+            .then(data => {
+                console.log("✅ GeoJSON Loaded | First feature:", data.features[0].properties);
+
+                const parcelsLayer = L.geoJSON(data, {
+                    style: function(feature) {
+                        return {
+                            fillColor: getColor(feature.properties.LandUse),
+                            weight: 1.2,
+                            opacity: 1,
+                            color: "white",
+                            fillOpacity: 0.75
+                        };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        const p = feature.properties;
+
+                        // Flexible field detection
+                        const upi = p.UPI || p.upi || p.Upi || p.ID || p.id || p.fid || p.Parcel_ID || "N/A";
+                        const area = p.Shape_Area || p.shape_area || p.Area || p.area || p.SHAPE_Area || "N/A";
+                        const landuse = p.LandUse || p.landuse || p.LANDUSE || "N/A";
+
+                        layer.bindPopup(`
+                            <strong>UPI:</strong> ${upi}<br>
+                            <strong>Land Use:</strong> ${landuse}<br>
+                            <strong>Area:</strong> ${Number(area).toFixed(2)} m²
+                        `);
+                    }
+                }).addTo(map);
+
+                // Zoom to the layer
+                map.fitBounds(parcelsLayer.getBounds(), { padding: [25, 25] });
+            })
+            .catch(error => {
+                console.error(error);
+                alert("Error loading GeoJSON.\nMake sure the filename is correct and file is in the same folder.");
+            });
+
+        // Legend
+        const legend = L.control({ position: 'bottomright' });
+        legend.onAdd = function () {
+            const div = L.DomUtil.create('div', 'legend');
+            div.innerHTML = `
+                <strong>Land Use Legend</strong><br>
+                <span style="color:#8B4513;">■</span> Residential<br>
+                <span style="color:#228B22;">■</span> Agricultural<br>
+                <span style="color:#FF0000;">■</span> Commercial<br>
+                <span style="color:#708090;">■</span> Others
+            `;
+            return div;
+        };
+        legend.addTo(map);
+    </script>
+</body>
+</html>
